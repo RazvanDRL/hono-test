@@ -19,7 +19,7 @@ app.post('/extract-from-url', async (c) => {
 
     console.log(`🔗 Processing video from URL: ${url}`)
 
-    const response = await fetch("http://localhost:9000", {
+    const response = await fetch("http://49.13.217.93:9000", {
       method: "POST",
       body: JSON.stringify({
         url: url,
