@@ -5,7 +5,8 @@ import os from "os";
 
 export async function extractFramesEverySecond(
     videoBuffer: Buffer,
-    saveDirectory?: string
+    fps: number = 3,
+    durationSeconds: number = 3,
 ): Promise<Array<{ timestamp: number; imageBuffer: Buffer; filePath?: string }>> {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "video-frames-"));
     const videoPath = path.join(tempDir, "video.mp4");
@@ -17,20 +18,19 @@ export async function extractFramesEverySecond(
 
         const frames: Array<{ timestamp: number; imageBuffer: Buffer; filePath?: string }> = [];
 
-        const finalFramesDir = saveDirectory || framesDir;
-        if (saveDirectory) {
-            await fs.mkdir(finalFramesDir, { recursive: true });
-            console.log(`📁 Saving frames to: ${finalFramesDir}`);
-            console.log(`📁 Absolute path: ${path.resolve(finalFramesDir)}`);
-        }
+        const finalFramesDir = framesDir;
 
         await new Promise<void>((resolve, reject) => {
+            const outputOptions = [
+                "-vf", `fps=${fps}`,
+                "-q:v", "2",
+                "-start_number", "0",
+            ];
+
+            outputOptions.push("-t", durationSeconds.toString());
+
             ffmpeg(videoPath)
-                .outputOptions([
-                    "-vf", "fps=1",
-                    "-q:v", "2",
-                    "-start_number", "0",
-                ])
+                .outputOptions(outputOptions)
                 .output(path.join(finalFramesDir, "frame_%03d.jpg"))
                 .on("end", () => resolve())
                 .on("error", (err) => {
@@ -60,7 +60,7 @@ export async function extractFramesEverySecond(
             const frameFile = sortedFrames[i];
             const framePath = path.join(finalFramesDir, frameFile);
             const imageBuffer = await fs.readFile(framePath);
-            const timestamp = i;
+            const timestamp = i / fps;
 
             const stats = await fs.stat(framePath);
             if (stats.size === 0) {
@@ -72,41 +72,15 @@ export async function extractFramesEverySecond(
                 imageBuffer,
             };
 
-            if (saveDirectory) {
-                frameData.filePath = framePath;
-                if (i < 5 || i === sortedFrames.length - 1) {
-                    console.log(`  ✓ Frame ${i}: ${frameFile} (${(stats.size / 1024).toFixed(2)} KB) -> ${framePath}`);
-                }
-            }
-
             frames.push(frameData);
-        }
-
-        if (saveDirectory) {
-            console.log(`✅ Successfully saved ${frames.length} frames to ${saveDirectory}`);
-
-            const summaryPath = path.join(finalFramesDir, "frames-summary.txt");
-            const summaryContent = `Video Frame Extraction Summary
-================================
-Total Frames: ${frames.length}
-Extraction Date: ${new Date().toISOString()}
-Directory: ${finalFramesDir}
-
-Frames:
-${frames.map((f, i) => `  ${i}. frame_${String(i).padStart(3, '0')}.jpg (timestamp: ${f.timestamp}s, size: ${(f.imageBuffer.length / 1024).toFixed(2)} KB)`).join('\n')}
-`;
-            await fs.writeFile(summaryPath, summaryContent);
-            console.log(`📄 Created summary file: ${summaryPath}`);
         }
 
         return frames;
     } finally {
-        if (!saveDirectory) {
-            try {
-                await fs.rm(tempDir, { recursive: true, force: true });
-            } catch (cleanupError) {
-                console.error("Error cleaning up temporary files:", cleanupError);
-            }
+        try {
+            await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+            console.error("Error cleaning up temporary files:", cleanupError);
         }
     }
 }

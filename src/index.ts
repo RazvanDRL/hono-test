@@ -11,7 +11,9 @@ app.get('/', (c) => {
 app.post('/extract-from-url', async (c) => {
   try {
     const body = await c.req.json()
-    const url = body.url
+    const url = body.url;
+    const max_duration = body.max_duration || 3;
+    const fps = body.fps || 3;
 
     if (!url || typeof url !== 'string') {
       return c.json({ error: 'No URL provided. Please provide a video URL.' }, 400)
@@ -53,8 +55,8 @@ app.post('/extract-from-url', async (c) => {
     const arrayBuffer = await videoResponse.arrayBuffer();
     console.log(`✅ Downloaded TikTok video data (${arrayBuffer.byteLength} bytes)`);
 
-    console.log(`🎬 Extracting frames from video (1 frame per second)...`);
-    const frames = await extractFramesEverySecond(Buffer.from(arrayBuffer));
+    console.log(`🎬 Extracting frames from video (${fps} fps${max_duration ? ` for first ${max_duration} seconds` : ''})...`);
+    const frames = await extractFramesEverySecond(Buffer.from(arrayBuffer), fps, max_duration);
 
     // Convert frames to base64 for easy transfer
     const framesBase64 = framesToBase64(frames)
