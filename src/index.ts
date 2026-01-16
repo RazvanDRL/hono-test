@@ -25,6 +25,7 @@ app.post('/extract-from-url', async (c) => {
       method: "POST",
       body: JSON.stringify({
         url: url,
+        videoQuality: "max",
       }),
       headers: {
         Authorization: `Bearer cobalt`,
@@ -34,7 +35,9 @@ app.post('/extract-from-url', async (c) => {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorBody = await response.text();
+      console.error(`Cobalt API error response: ${errorBody}`);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
     }
 
     const responseData = await response.json();
@@ -64,6 +67,7 @@ app.post('/extract-from-url', async (c) => {
     return c.json({
       success: true,
       message: `Extracted ${frames.length} frames from video`,
+      downloadUrl: videoTunnel,
       frames: framesBase64.map(frame => ({
         timestamp: frame.timestamp,
         base64Image: `data:image/jpeg;base64,${frame.base64}`
