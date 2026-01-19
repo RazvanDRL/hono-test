@@ -12,42 +12,50 @@ app.post('/extract-from-url', async (c) => {
   try {
     const body = await c.req.json()
     const url = body.url;
+    const source_url = body.source_url;
     const max_duration = body.max_duration || 3;
     const fps = body.fps || 3;
 
-    if (!url || typeof url !== 'string') {
-      return c.json({ error: 'No URL provided. Please provide a video URL.' }, 400)
+    if (!source_url && (!url || typeof url !== 'string')) {
+      return c.json({ error: 'No URL provided. Please provide a video URL or source_url.' }, 400)
     }
 
-    console.log(`🔗 Processing video from URL: ${url}`)
+    let videoTunnel: string;
 
-    const response = await fetch("http://49.13.217.93:9000", {
-      method: "POST",
-      body: JSON.stringify({
-        url: url,
-        videoQuality: "max",
-      }),
-      headers: {
-        Authorization: `Bearer cobalt`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    });
+    if (source_url) {
+      console.log(`🔗 Using provided source_url directly: ${source_url}`);
+      videoTunnel = source_url;
+    } else {
+      console.log(`🔗 Processing video from URL: ${url}`);
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`Cobalt API error response: ${errorBody}`);
-      throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+      const response = await fetch("http://49.13.217.93:9000", {
+        method: "POST",
+        body: JSON.stringify({
+          url: url,
+          videoQuality: "max",
+        }),
+        headers: {
+          Authorization: `Bearer cobalt`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`Cobalt API error response: ${errorBody}`);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+      }
+
+      const responseData = await response.json();
+
+      if (!responseData) {
+        throw new Error("No download URL found in API response");
+      }
+
+      videoTunnel = responseData.url;
+      console.log(`📡 Got video download URL: ${videoTunnel}`);
     }
-
-    const responseData = await response.json();
-
-    if (!responseData) {
-      throw new Error("No download URL found in API response");
-    }
-
-    const videoTunnel = responseData.url;
-    console.log(`📡 Got video download URL: ${videoTunnel}`);
 
     const videoResponse = await fetch(videoTunnel);
 
