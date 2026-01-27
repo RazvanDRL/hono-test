@@ -1,6 +1,9 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import { bearerAuth } from 'hono/bearer-auth'
+import { bodyLimit } from 'hono/body-limit'
 import { extractFramesEverySecond, framesToBase64 } from '../vid.js'
+import { ffmpegHandler } from './routes/ffmpeg.js'
 
 const app = new Hono()
 
@@ -91,6 +94,19 @@ app.post('/extract-from-url', async (c) => {
 })
 
 
+const FFMPEG_API_KEY = process.env.FFMPEG_API_KEY
+
+if (FFMPEG_API_KEY) {
+  app.post(
+    '/ffmpeg',
+    bearerAuth({ token: FFMPEG_API_KEY }),
+    bodyLimit({ maxSize: 500 * 1024 * 1024 }),
+    ffmpegHandler
+  )
+} else {
+  console.warn('WARNING: FFMPEG_API_KEY not set — POST /ffmpeg route will not be registered')
+}
+
 serve({
   fetch: app.fetch,
   port: 3000
@@ -98,4 +114,7 @@ serve({
   console.log(`Server is running on http://localhost:${info.port}`)
   console.log(`\nEndpoints:`)
   console.log(`  POST /extract-from-url - Download video from URL and extract frames`)
+  if (FFMPEG_API_KEY) {
+    console.log(`  POST /ffmpeg           - Process media with FFmpeg (Bearer auth required)`)
+  }
 })
